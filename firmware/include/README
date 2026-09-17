@@ -1,37 +1,88 @@
+# Firmware (ESP32 motor control)
 
-This directory is intended for project header files.
+This is the code that actually drives the rover's motors. It runs on the ESP32 and just
+sits there listening on serial for commands like `L:150,R:-100`, then spins the motors
+accordingly. Eventually the line-detection code will be the one sending these commands,
+but for now you can just type them into the Serial Monitor to test.
 
-A header file is a file containing C declarations and macro definitions
-to be shared between several project source files. You request the use of a
-header file in your project source file (C, C++, etc) located in `src` folder
-by including it, with the C preprocessing directive `#include'.
+## Wiring
 
-```src/main.c
+Using a basic dual H-bridge driver (L298N-style, two enable pins + 4 direction pins):
 
-#include "header.h"
+```
+ENA -> 25   (left speed / PWM)
+IN1 -> 26   (left direction)
+IN2 -> 27   (left direction)
 
-int main (void)
-{
- ...
-}
+ENB -> 33   (right speed / PWM)
+IN3 -> 32   (right direction)
+IN4 -> 18   (right direction)
 ```
 
-Including a header file produces the same results as copying the header file
-into each source file that needs it. Such copying would be time-consuming
-and error-prone. With a header file, the related declarations appear
-in only one place. If they need to be changed, they can be changed in one
-place, and programs that include the header file will automatically use the
-new version when next recompiled. The header file eliminates the labor of
-finding and changing all the copies as well as the risk that a failure to
-find one copy will result in inconsistencies within a program.
+## How to flash it
 
-In C, the convention is to give header files names that end with `.h'.
+Using PlatformIO:
 
-Read more about using header files in official GCC documentation:
+```bash
+cd firmware
+pio run -t upload
+pio device monitor -b 115200
+```
 
-* Include Syntax
-* Include Operation
-* Once-Only Headers
-* Computed Includes
+## Command format
 
-https://gcc.gnu.org/onlinedocs/cpp/Header-Files.html
+Send this over serial, one line at a time:
+
+```
+L:<num>,R:<num>
+```
+
+Numbers can be -255 to 255. Positive = forward, negative = reverse, 0 = stop.
+
+Example — spin in place:
+```
+L:150,R:-150
+```
+
+If it doesn't understand what you sent, it'll tell you:
+- Wrong format (no `L:`/`,R:` found) → `Invalid Format. Use L:<val>,R:<val>`
+- Not actually a number (like `L:abc,R:100`) → `Invalid Value: Provide integer values`
+
+## What's built in so far
+
+**If serial goes quiet, it stops on its own.**
+If no valid command shows up for 200ms, both motors ramp down to zero automatically.
+This is basically so it doesn't keep driving forever if the laptop/line-detection board
+crashes or the cable comes loose — figured that's more important to get right before
+anything else since this thing can drive off on its own.
+
+**Motors ramp instead of jumping.**
+If you go from full forward to full reverse, it doesn't slam the direction instantly —
+it steps toward the new target a little bit each loop. Keeps the current draw sane and
+stops the rover from jerking around, which matters more once line-detection is sending
+rapidly changing values.
+
+**PWM is at 5kHz.**
+Started at 100Hz which made the motors audibly whine. 5kHz is smooth and quiet.
+
+**There's a PWM floor.**
+Anything above 0 gets mapped so it's never below `MIN_PWM` (10), so it doesn't try to
+move at a PWM so low the motor just sits there buzzing without actually turning.
+
+## Constants you might want to tweak later
+
+These are near the top of `main.cpp`:
+
+- `COMMAND_TIMEOUT` (currently 200ms) — how long before it decides comms are dead and stops
+- `RAMP_STEP` (currently 5) — how fast it ramps to a new speed. Lower = smoother but slower to react
+- `MIN_PWM` (currently 10) — minimum PWM before it stops bothering to try
+
+Haven't actually road-tested these numbers on real hardware yet, just went with reasonable
+starting guesses. Will probably need adjusting once I see how it actually drives.
+
+## Stuff I still need to add
+
+- A hard cap on max speed (don't want this thing going full send by accident)
+- Some kind of dedicated STOP command, separate from the L:/R: format, just in case
+- Might eventually swap off Arduino's `String` class for parsing if it ever seems to
+  cause memory issues running for a long time — not a problem yet, just a "someday" thing

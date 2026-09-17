@@ -8,8 +8,11 @@
 #define IN4 18
 
 const int MIN_PWM = 10;
-const int RAMP_STEP = 5 const unsigned long COMMAND_TIMEOUT = 200;
+const int RAMP_STEP = 5;
+const unsigned long COMMAND_TIMEOUT = 200;
 unsigned long lastCommandTime = 0;
+unsigned long lastRampTime = 0;
+const unsigned long RAMP_TIME = 20;
 int leftCurrentPWM = 0;
 int rightCurrentPWM = 0;
 int leftTargetPWM = 0;
@@ -89,6 +92,10 @@ void setup()
 
 void updateRamping()
 {
+    if(millis() - lastRampTime < RAMP_TIME){
+        return;
+    }
+    lastRampTime = millis();
     if (leftCurrentPWM == leftTargetPWM)
     {
         // do Nothing
