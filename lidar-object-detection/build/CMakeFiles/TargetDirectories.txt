@@ -1,0 +1,3 @@
+/home/akxis/akx_Development/Autonomous_Rover_Vision_LiDAR_System/lidar-object-detection/build/CMakeFiles/lidar_stop.dir
+/home/akxis/akx_Development/Autonomous_Rover_Vision_LiDAR_System/lidar-object-detection/build/CMakeFiles/edit_cache.dir
+/home/akxis/akx_Development/Autonomous_Rover_Vision_LiDAR_System/lidar-object-detection/build/CMakeFiles/rebuild_cache.dir
